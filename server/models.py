@@ -22,6 +22,8 @@ class Hero(db.Model, SerializerMixin):
     powers = db.relationship("HeroPower",back_populates = "hero", cascade = "all, delete")
 
     # add serialization rules
+    serialize_rules = ('-powers.hero',)
+
 
     def __repr__(self):
         return f'<Hero {self.id}>'
@@ -38,6 +40,8 @@ class Power(db.Model, SerializerMixin):
     heroes = db.relationship("HeroPower",back_populates = "power", cascade = "all, delete")
 
     # add serialization rules
+    serialize_rules = ('-heroes.power',)
+
 
     # add validation
 
@@ -56,6 +60,7 @@ class HeroPower(db.Model, SerializerMixin):
     power = db.relationship("Power" ,back_populates = "heroes")
 
     # add serialization rules
+    serialize_rules = ('-hero.powers', '-power.heroes')
 
     # add validation
 
