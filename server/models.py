@@ -10,7 +10,6 @@ metadata = MetaData(naming_convention={
 
 db = SQLAlchemy(metadata=metadata)
 
-
 class Hero(db.Model, SerializerMixin):
     __tablename__ = 'heroes'
 
@@ -18,12 +17,11 @@ class Hero(db.Model, SerializerMixin):
     name = db.Column(db.String)
     super_name = db.Column(db.String)
 
-    # add relationship
-    powers = db.relationship("HeroPower",back_populates = "hero", cascade = "all, delete")
+    # Corrected relationship for many-to-many
+    powers = db.relationship("HeroPower", back_populates="hero", cascade="all, delete")
 
     # add serialization rules
     serialize_rules = ('-powers.hero',)
-
 
     def __repr__(self):
         return f'<Hero {self.id}>'
@@ -36,12 +34,11 @@ class Power(db.Model, SerializerMixin):
     name = db.Column(db.String)
     description = db.Column(db.String)
 
-    # add relationship
-    heroes = db.relationship("HeroPower",back_populates = "power", cascade = "all, delete")
+    # Corrected relationship for many-to-many
+    heroes = db.relationship("HeroPower", back_populates="power", cascade="all, delete")
 
     # add serialization rules
     serialize_rules = ('-heroes.power',)
-
 
     # add validation
     @validates('description')
@@ -60,9 +57,13 @@ class HeroPower(db.Model, SerializerMixin):
     id = db.Column(db.Integer, primary_key=True)
     strength = db.Column(db.String, nullable=False)
 
+    # add relationships with Foreign Keys
+    hero_id = db.Column(db.Integer, db.ForeignKey('heroes.id'), nullable=False)
+    power_id = db.Column(db.Integer, db.ForeignKey('powers.id'), nullable=False)
+
     # add relationships
-    hero = db.relationship("Hero" ,back_populates = "powers")
-    power = db.relationship("Power" ,back_populates = "heroes")
+    hero = db.relationship("Hero", back_populates="powers")
+    power = db.relationship("Power", back_populates="heroes")
 
     # add serialization rules
     serialize_rules = ('-hero.powers', '-power.heroes')
