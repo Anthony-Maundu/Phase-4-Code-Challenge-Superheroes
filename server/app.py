@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from flask import Flask, request, make_response, jsonify
+from flask import Flask, request, make_response
 from flask_migrate import Migrate
 from flask_restful import Api, Resource
 from models import db, Hero, Power, HeroPower
@@ -23,95 +23,87 @@ db.init_app(app)
 def index():
     return '<h1>Code challenge</h1>'
 
-# Routes for Hero
-@app.route('/heroes', methods=['GET', 'POST'])
-def handle_heroes():
-    if request.method == 'GET':
-        heroes = Hero.query.all()
-        return make_response(jsonify([hero.to_dict() for hero in heroes]), 200)
-    elif request.method == 'POST':
-        new_hero = Hero(
-            name=request.json['name'], 
-            super_name=request.json['super_name']
-        )
-        db.session.add(new_hero)
-        db.session.commit()
-        return make_response(new_hero.to_dict(), 201)
+@app.route('/heroes')
+def heroes():
+    heroes = [hero.to_dict(only=('id', 'name', 'super_name')) for hero in Hero.query.all()]
+    return make_response(heroes, 200)
 
-@app.route('/heroes/<int:hero_id>', methods=['GET', 'PUT', 'DELETE'])
-def handle_hero(hero_id):
-    hero = Hero.query.get_or_404(hero_id)
-    if request.method == 'GET':
-        return make_response(hero.to_dict(), 200)
-    elif request.method == 'PUT':
-        hero.name = request.json.get('name', hero.name)
-        hero.super_name = request.json.get('super_name', hero.super_name)
-        db.session.commit()
-        return make_response(hero.to_dict(), 200)
-    elif request.method == 'DELETE':
-        db.session.delete(hero)
-        db.session.commit()
-        return make_response({'message': 'Hero deleted'}, 204)
+@app.route('/heroes/<int:id>')
+def heroes_by_id(id):
+    hero = Hero.query.filter(Hero.id==id).first()
+    if not hero:
+        error_body = {
+            "error": "Hero not found"
+            }
+        return make_response(error_body, 404)
+    
+    return make_response(hero.to_dict(), 200)
 
-# Routes for Power
-@app.route('/powers', methods=['GET', 'POST'])
-def handle_powers():
+@app.route('/powers')
+def powers():
+    powers = [power.to_dict(only=('description', 'id', 'name')) for power in Power.query.all()]
+    return make_response(powers, 200)
+
+@app.route('/powers/<int:id>',  methods=['GET', 'PATCH'])
+def powers_by_id(id):
+    power = Power.query.filter(Power.id==id).first()
+    if not power:
+        error_body = {
+            "error": "Power not found"
+            }
+        return make_response(error_body, 404)
     if request.method == 'GET':
-        powers = Power.query.all()
-        return make_response(jsonify([power.to_dict() for power in powers]), 200)
+        return make_response(power.to_dict(only=('description', 'id', 'name')), 200)
+    elif request.method == 'PATCH':
+        validation_errors = []
+
+        # Update power attributes and validate
+        for attr in request.json:
+            if attr == 'description':
+                description_value = request.json.get(attr)
+                if not isinstance(description_value, str) or len(description_value) < 20:
+                    validation_errors.append("validation errors")
+            else:
+                setattr(power, attr, request.json.get(attr))
+
+        # If there are validation errors, return a standardized error response
+        if validation_errors:
+            return make_response({"errors": validation_errors}, 400)  # Bad Request status code
+
+        # Update valid fields and commit changes
+        for attr in request.json:
+            setattr(power, attr, request.json.get(attr))
+
+        db.session.commit()
+        return make_response(power.to_dict(), 200)
+
+@app.route('/hero_powers', methods=['GET', 'POST'])
+def hero_powers():
+    if request.method == 'GET':
+        hero_power = HeroPower.query.all()
+        return make_response([hero_power.to_dict() for hero_power in hero_power], 200)
+
     elif request.method == 'POST':
-        new_power = Power(
-            name=request.json['name'], 
-            description=request.json['description']
+        strength = request.json.get('strength')
+        power_id = request.json.get('power_id')
+        hero_id = request.json.get('hero_id')
+
+        #Could not figure out how to import validation
+        valid_strengths = {'Strong', 'Weak', 'Average'}
+        if strength not in valid_strengths:
+            return make_response({"errors": ["validation errors"]}, 400)
+
+        # Create a new HeroPower instance
+        new_power = HeroPower(
+            strength=strength,
+            power_id=power_id,
+            hero_id=hero_id
         )
+
+        # Commit changes
         db.session.add(new_power)
         db.session.commit()
-        return make_response(new_power.to_dict(), 201)
-
-@app.route('/powers/<int:power_id>', methods=['GET', 'PUT', 'DELETE'])
-def handle_power(power_id):
-    power = Power.query.get_or_404(power_id)
-    if request.method == 'GET':
-        return make_response(power.to_dict(), 200)
-    elif request.method == 'PUT':
-        power.name = request.json.get('name', power.name)
-        power.description = request.json.get('description', power.description)
-        db.session.commit()
-        return make_response(power.to_dict(), 200)
-    elif request.method == 'DELETE':
-        db.session.delete(power)
-        db.session.commit()
-        return make_response({'message': 'Power deleted'}, 204)
-
-# Routes for HeroPower
-@app.route('/hero_powers', methods=['GET', 'POST'])
-def handle_hero_powers():
-    if request.method == 'GET':
-        hero_powers = HeroPower.query.all()
-        return make_response(jsonify([hero_power.to_dict() for hero_power in hero_powers]), 200)
-    elif request.method == 'POST':
-        new_hero_power = HeroPower(
-            strength=request.json['strength'],
-            hero_id=request.json['hero_id'],
-            power_id=request.json['power_id']
-        )
-        db.session.add(new_hero_power)
-        db.session.commit()
-        return make_response(new_hero_power.to_dict(), 201)
-
-@app.route('/hero_powers/<int:hero_power_id>', methods=['GET', 'PUT', 'DELETE'])
-def handle_hero_power(hero_power_id):
-    hero_power = HeroPower.query.get_or_404(hero_power_id)
-    if request.method == 'GET':
-        return make_response(hero_power.to_dict(), 200)
-    elif request.method == 'PUT':
-        hero_power.strength = request.json.get('strength', hero_power.strength)
-        db.session.commit()
-        return make_response(hero_power.to_dict(), 200)
-    elif request.method == 'DELETE':
-        db.session.delete(hero_power)
-        db.session.commit()
-        return make_response({'message': 'HeroPower deleted'}, 204)
-
+        return make_response(new_power.to_dict(), 200)
+    
 if __name__ == '__main__':
     app.run(port=5555, debug=True)
